@@ -1,19 +1,81 @@
 import { Users, Bus, Receipt, Wallet, TrendingUp, TrendingDown } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatCurrency } from '@/lib/utils'
+import { createClient } from '@/lib/supabase/server'
 
-export default function DashboardPage() {
-    // Mock data - this will be replaced with real data from Supabase
-    const stats = {
-        totalUsers: 1247,
-        activeBuses: 23,
-        todayTransactions: 156,
-        todayRevenue: 4580000,
-        userGrowth: 12.5,
-        busGrowth: 5.2,
-        transactionGrowth: -3.1,
-        revenueGrowth: 8.7
+async function getDashboardStats() {
+    const supabase = await createClient()
+
+    // Get total users
+    const { count: totalUsers } = await supabase
+        .from('users')
+        .select('*', { count: 'exact', head: true })
+
+    // Get active buses (available or full)
+    const { count: activeBuses } = await supabase
+        .from('buses')
+        .select('*', { count: 'exact', head: true })
+        .in('status', ['available', 'full'])
+
+    // Get today's transactions
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const tomorrow = new Date(today)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+
+    const { count: todayTransactions, data: todayTxData } = await supabase
+        .from('transactions')
+        .select('amount', { count: 'exact' })
+        .gte('created_at', today.toISOString())
+        .lt('created_at', tomorrow.toISOString())
+        .eq('payment_status', 'settlement')
+
+    // Calculate today's revenue
+    const todayRevenue = (todayTxData as any[])?.reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0) || 0
+
+    // Get last month's data for comparison
+    const lastMonth = new Date()
+    lastMonth.setMonth(lastMonth.getMonth() - 1)
+    lastMonth.setHours(0, 0, 0, 0)
+    const thisMonth = new Date()
+    thisMonth.setHours(0, 0, 0, 0)
+    thisMonth.setDate(1)
+
+    const { count: lastMonthUsers } = await supabase
+        .from('users')
+        .select('*', { count: 'exact', head: true })
+        .lt('created_at', thisMonth.toISOString())
+
+    const { count: lastMonthTransactions } = await supabase
+        .from('transactions')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', lastMonth.toISOString())
+        .lt('created_at', thisMonth.toISOString())
+        .eq('payment_status', 'settlement')
+
+    // Calculate growth percentages
+    const userGrowth = lastMonthUsers && lastMonthUsers > 0
+        ? ((totalUsers || 0) - lastMonthUsers) / lastMonthUsers * 100
+        : 0
+
+    const transactionGrowth = lastMonthTransactions && lastMonthTransactions > 0
+        ? ((todayTransactions || 0) - lastMonthTransactions) / lastMonthTransactions * 100
+        : 0
+
+    return {
+        totalUsers: totalUsers || 0,
+        activeBuses: activeBuses || 0,
+        todayTransactions: todayTransactions || 0,
+        todayRevenue,
+        userGrowth,
+        busGrowth: 0, // Can be calculated if you track bus additions
+        transactionGrowth,
+        revenueGrowth: 0 // Can be calculated by comparing with last month's revenue
     }
+}
+
+export default async function DashboardPage() {
+    const stats = await getDashboardStats()
 
     return (
         <div className="space-y-8">
@@ -36,13 +98,24 @@ export default function DashboardPage() {
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-white">{stats.totalUsers.toLocaleString()}</div>
-                        <div className="flex items-center gap-1 mt-2 text-sm">
-                            <TrendingUp className="h-4 w-4 text-green-500" />
-                            <span className="font-medium text-green-500">
-                                {stats.userGrowth.toFixed(1)}%
-                            </span>
-                            <span className="text-slate-500">from last month</span>
-                        </div>
+                        {stats.userGrowth !== 0 && (
+                            <div className="flex items-center gap-1 mt-2 text-sm">
+                                {stats.userGrowth > 0 ? (
+                                    <TrendingUp className="h-4 w-4 text-green-500" />
+                                ) : (
+                                    <TrendingDown className="h-4 w-4 text-red-500" />
+                                )}
+                                <span className={`font-medium ${stats.userGrowth > 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                    {Math.abs(stats.userGrowth).toFixed(1)}%
+                                </span>
+                                <span className="text-slate-500">from last month</span>
+                            </div>
+                        )}
+                        {stats.userGrowth === 0 && (
+                            <div className="flex items-center gap-1 mt-2 text-sm">
+                                <span className="text-slate-500">No change from last month</span>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
 
@@ -57,11 +130,7 @@ export default function DashboardPage() {
                     <CardContent>
                         <div className="text-2xl font-bold text-white">{stats.activeBuses}</div>
                         <div className="flex items-center gap-1 mt-2 text-sm">
-                            <TrendingUp className="h-4 w-4 text-green-500" />
-                            <span className="font-medium text-green-500">
-                                {stats.busGrowth.toFixed(1)}%
-                            </span>
-                            <span className="text-slate-500">from last month</span>
+                            <span className="text-slate-500">Currently in service</span>
                         </div>
                     </CardContent>
                 </Card>
@@ -76,13 +145,24 @@ export default function DashboardPage() {
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-white">{stats.todayTransactions}</div>
-                        <div className="flex items-center gap-1 mt-2 text-sm">
-                            <TrendingDown className="h-4 w-4 text-red-500" />
-                            <span className="font-medium text-red-500">
-                                {Math.abs(stats.transactionGrowth).toFixed(1)}%
-                            </span>
-                            <span className="text-slate-500">from last month</span>
-                        </div>
+                        {stats.transactionGrowth !== 0 && (
+                            <div className="flex items-center gap-1 mt-2 text-sm">
+                                {stats.transactionGrowth > 0 ? (
+                                    <TrendingUp className="h-4 w-4 text-green-500" />
+                                ) : (
+                                    <TrendingDown className="h-4 w-4 text-red-500" />
+                                )}
+                                <span className={`font-medium ${stats.transactionGrowth > 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                    {Math.abs(stats.transactionGrowth).toFixed(1)}%
+                                </span>
+                                <span className="text-slate-500">vs last month</span>
+                            </div>
+                        )}
+                        {stats.transactionGrowth === 0 && (
+                            <div className="flex items-center gap-1 mt-2 text-sm">
+                                <span className="text-slate-500">Settled payments</span>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
 
@@ -97,11 +177,7 @@ export default function DashboardPage() {
                     <CardContent>
                         <div className="text-2xl font-bold text-white">{formatCurrency(stats.todayRevenue)}</div>
                         <div className="flex items-center gap-1 mt-2 text-sm">
-                            <TrendingUp className="h-4 w-4 text-green-500" />
-                            <span className="font-medium text-green-500">
-                                {stats.revenueGrowth.toFixed(1)}%
-                            </span>
-                            <span className="text-slate-500">from last month</span>
+                            <span className="text-slate-500">From {stats.todayTransactions} transactions</span>
                         </div>
                     </CardContent>
                 </Card>

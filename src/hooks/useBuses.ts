@@ -23,13 +23,7 @@ export function useBuses() {
                 .from('buses')
                 .select(`
           *,
-          route:routes(id, route_number, route_name),
-          driver:drivers!buses_id_fkey(
-            id,
-            full_name,
-            email,
-            phone_number
-          )
+          route:routes(id, route_number, route_name)
         `, { count: 'exact' })
                 .range(from, to)
                 .order('created_at', { ascending: false })
@@ -42,7 +36,7 @@ export function useBuses() {
                 query = query.eq('route_id', filters.route_id)
             }
             if (filters?.search) {
-                query = query.or(`bus_number.ilike.%${filters.search}%`)
+                query = query.ilike('bus_number', `%${filters.search}%`)
             }
 
             const { data, error, count } = await query
@@ -53,6 +47,7 @@ export function useBuses() {
             setTotalCount(count || 0)
         } catch (err: any) {
             setError(err.message)
+            console.error('Error fetching buses:', err)
         } finally {
             setLoading(false)
         }

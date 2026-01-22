@@ -82,9 +82,6 @@ export default function BusesPage() {
                                     Status
                                 </th>
                                 <th className="px-6 py-4 text-left text-sm font-medium text-slate-300">
-                                    Driver
-                                </th>
-                                <th className="px-6 py-4 text-left text-sm font-medium text-slate-300">
                                     Last Updated
                                 </th>
                                 <th className="px-6 py-4 text-left text-sm font-medium text-slate-300">
@@ -95,18 +92,18 @@ export default function BusesPage() {
                         <tbody>
                             {loading ? (
                                 <tr>
-                                    <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
+                                    <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
                                         Loading buses...
                                     </td>
                                 </tr>
                             ) : buses.length === 0 ? (
                                 <tr>
-                                    <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
+                                    <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
                                         No buses found. Add your first bus to get started.
                                     </td>
                                 </tr>
                             ) : (
-                                buses.map((bus) => (
+                                buses.map((bus: any) => (
                                     <tr
                                         key={bus.id}
                                         className="border-b border-slate-800 hover:bg-slate-800/50 transition-colors"
@@ -136,24 +133,17 @@ export default function BusesPage() {
                                         <td className="px-6 py-4">
                                             <span
                                                 className={cn(
-                                                    'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
+                                                    'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium capitalize',
                                                     getStatusColor(bus.status)
                                                 )}
                                             >
-                                                {bus.status}
+                                                {bus.status.replace('_', ' ')}
                                             </span>
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <div className="text-slate-300">
-                                                {bus.driver ? (
-                                                    <div className="font-medium">{bus.driver.full_name}</div>
-                                                ) : (
-                                                    <span className="text-slate-500">Not assigned</span>
-                                                )}
-                                            </div>
-                                        </td>
                                         <td className="px-6 py-4 text-slate-400 text-sm">
-                                            {formatDate(bus.updated_at || bus.created_at)}
+                                            {bus.updated_at || bus.created_at
+                                                ? formatDate(bus.updated_at || bus.created_at!)
+                                                : 'N/A'}
                                         </td>
                                         <td className="px-6 py-4">
                                             <Link

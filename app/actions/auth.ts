@@ -54,13 +54,19 @@ export async function loginAdmin(email: string, password: string) {
         cookieStore.set('admin_session', JSON.stringify(sessionData), {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
+            sameSite: 'strict',
+            path: '/', // Ensure cookie is accessible site-wide
             maxAge: 24 * 60 * 60 // 24 hours
         })
 
         return { success: true }
     } catch (error: any) {
         console.error('Login error:', error)
+        console.error('Error details:', {
+            message: error.message,
+            code: error.code,
+            details: error.details
+        })
         return { error: 'Login failed' }
     }
 }
